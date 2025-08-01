@@ -4,7 +4,7 @@ const cors = require("cors");
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-const TO_EMAIL = 'torikul.meraj@gmail.com';
+const TO_EMAILS = ['marketing@atelier-fusari.com', 'benoit@atelier-fusari.com'];
 
 // Middleware
 app.use(cors({
@@ -234,7 +234,7 @@ app.post('/submit-distributorship-form', async (req, res) => {
     // Email options with HTML content only
     const mailOptions = {
       from: 'Fusari Pro <fusaripro@gmail.com>',
-      to: TO_EMAIL,
+      to: TO_EMAILS.join(', '),
       subject: 'New Distributorship Form Submission - Fusari Pro',
       html: emailHtmlContent
     };
