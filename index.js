@@ -267,7 +267,11 @@ app.post('/submit-distributorship-form', async (req, res) => {
     };
 
     // Send email
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions).then(res => {
+      console.log('Email sent successfully');
+    }).catch(err => {
+      console.log('Error sending email:', err);
+    });
 
     // Clean up the temporary PDF file
     fs.unlinkSync(pdfFilePath)
