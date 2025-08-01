@@ -1,9 +1,6 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
-const puppeteer = require("puppeteer");
-const fs = require("fs");
-const path = require("path");
 const app = express();
 
 const PORT = process.env.PORT || 5000;
@@ -33,42 +30,14 @@ app.get("/", (req, res) => {
   res.send("Server is running");
 });
 
-// Function to generate PDF from HTML content
-async function generatePDF(htmlContent) {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
-  const page = await browser.newPage();
-  await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-  const pdfBuffer = await page.pdf({
-    format: 'A4',
-    printBackground: true,
-    margin: {
-      top: '20mm',
-      right: '20mm',
-      bottom: '20mm',
-      left: '20mm'
-    }
-  });
-
-  await browser.close();
-  return pdfBuffer;
-}
-
 // Form submission endpoint
 app.post('/submit-distributorship-form', async (req, res) => {
   try {
-    res.status(200).json({
-      success: true,
-      message: 'Form submitted successfully! We will contact you soon.'
-    });
+
     const formData = req.body;
 
-    // Format the email content for PDF
-    const pdfHtmlContent = `
+    // Format the email content as HTML
+    const emailHtmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -95,7 +64,6 @@ app.post('/submit-distributorship-form', async (req, res) => {
           }
           .section { 
             margin-bottom: 30px; 
-            page-break-inside: avoid;
           }
           .section h3 { 
             color: #2c3e50; 
@@ -122,8 +90,21 @@ app.post('/submit-distributorship-form', async (req, res) => {
             color: #e74c3c; 
             font-style: italic; 
           }
-          .page-break {
-            page-break-before: always;
+          .button-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+          }
+          .button-tag {
+            background-color: #3498db;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+            margin: 2px;
           }
         </style>
       </head>
@@ -162,7 +143,11 @@ app.post('/submit-distributorship-form', async (req, res) => {
             <h3>👔 Current Product Offering</h3>
             <div class="question">
               <strong>What types of garments do you currently offer?</strong>
-              <div class="answer">${Array.isArray(formData.current_products) ? formData.current_products.join(', ') : formData.current_products || '<span class="no-answer">Not provided</span>'}</div>
+              <div class="answer">
+                ${Array.isArray(formData.current_products) && formData.current_products.length > 0 
+                  ? `<div class="button-tags">${formData.current_products.map(item => `<span class="button-tag">${item}</span>`).join('')}</div>` 
+                  : formData.current_products || '<span class="no-answer">Not provided</span>'}
+              </div>
             </div>
             <div class="question">
               <strong>What is your average order size per customer in term of Product number per order?</strong>
@@ -194,7 +179,11 @@ app.post('/submit-distributorship-form', async (req, res) => {
             </div>
             <div class="question">
               <strong>What are your biggest challenges with your current suppliers?</strong>
-              <div class="answer">${Array.isArray(formData.supplier_challenges) ? formData.supplier_challenges.join(', ') : formData.supplier_challenges || '<span class="no-answer">Not provided</span>'}</div>
+              <div class="answer">
+                ${Array.isArray(formData.supplier_challenges) && formData.supplier_challenges.length > 0 
+                  ? `<div class="button-tags">${formData.supplier_challenges.map(item => `<span class="button-tag">${item}</span>`).join('')}</div>` 
+                  : formData.supplier_challenges || '<span class="no-answer">Not provided</span>'}
+              </div>
             </div>
             <div class="question">
               <strong>Do you feel you are losing time when taking orders?</strong>
@@ -210,11 +199,19 @@ app.post('/submit-distributorship-form', async (req, res) => {
             </div>
             <div class="question">
               <strong>Are you open to exploring a supplier offering:</strong>
-              <div class="answer">${Array.isArray(formData.interest_in_new_supplier) ? formData.interest_in_new_supplier.join(', ') : formData.interest_in_new_supplier || '<span class="no-answer">Not provided</span>'}</div>
+              <div class="answer">
+                ${Array.isArray(formData.interest_in_new_supplier) && formData.interest_in_new_supplier.length > 0 
+                  ? `<div class="button-tags">${formData.interest_in_new_supplier.map(item => `<span class="button-tag">${item}</span>`).join('')}</div>` 
+                  : formData.interest_in_new_supplier || '<span class="no-answer">Not provided</span>'}
+              </div>
             </div>
             <div class="question">
               <strong>What factors would influence you to switch or add a new supplier?</strong>
-              <div class="answer">${Array.isArray(formData.supplier_switch_factors) ? formData.supplier_switch_factors.join(', ') : formData.supplier_switch_factors || '<span class="no-answer">Not provided</span>'}</div>
+              <div class="answer">
+                ${Array.isArray(formData.supplier_switch_factors) && formData.supplier_switch_factors.length > 0 
+                  ? `<div class="button-tags">${formData.supplier_switch_factors.map(item => `<span class="button-tag">${item}</span>`).join('')}</div>` 
+                  : formData.supplier_switch_factors || '<span class="no-answer">Not provided</span>'}
+              </div>
             </div>
             <div class="question">
               <strong>Would you be interested in discovering our offering to evaluate all our benefits?</strong>
@@ -234,47 +231,23 @@ app.post('/submit-distributorship-form', async (req, res) => {
       </html>
     `;
 
-    // Generate PDF
-    const pdfBuffer = await generatePDF(pdfHtmlContent);
-
-    // Create a temporary file name with timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const pdfFileName = `distributorship-form-${timestamp}.pdf`;
-    const pdfFilePath = path.join(__dirname, pdfFileName);
-
-    // Write PDF buffer to file
-    fs.writeFileSync(pdfFilePath, pdfBuffer);
-
-    // Email options with PDF attachment
+    // Email options with HTML content only
     const mailOptions = {
       from: 'Fusari Pro <fusaripro@gmail.com>',
-      to: TO_EMAIL, // Replace with recipient email
+      to: TO_EMAIL,
       subject: 'New Distributorship Form Submission - Fusari Pro',
-      html: `
-        <h2>New Distributorship Form Submission</h2>
-        <p>A new distributorship form has been submitted. Please find the detailed form data attached as a PDF.</p>
-        <p><strong>Store Name:</strong> ${formData.store_name || 'Not provided'}</p>
-        <p><strong>Store Location:</strong> ${formData.store_location || 'Not provided'}</p>
-        <p><strong>Email:</strong> ${formData.email || 'Not provided'}</p>
-        <p><strong>Submitted on:</strong> ${new Date().toLocaleString()}</p>
-      `,
-      attachments: [
-        {
-          filename: pdfFileName,
-          path: pdfFilePath
-        }
-      ]
+      html: emailHtmlContent
     };
 
     // Send email
     await transporter.sendMail(mailOptions).then(res => {
-      console.log('Email sent successfully');
     }).catch(err => {
       console.log('Error sending email:', err);
     });
-
-    // Clean up the temporary PDF file
-    fs.unlinkSync(pdfFilePath)
+    res.status(200).json({
+      success: true,
+      message: 'Form submitted successfully! We will contact you soon.'
+    });
 
   } catch (error) {
     console.error('Error sending email:', error);
